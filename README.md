@@ -1,4 +1,5 @@
 # Google Maps API Cache
+hello world
 
 Google Maps API caching server to reduce the amount of queries which are hammered against the google maps api. The proxy just caches duplicate requests. The project is fully complient to the google maps api guidelines and it adds a privacy layer for client side api calls.
 
