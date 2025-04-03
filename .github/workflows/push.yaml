@@ -1,0 +1,49 @@
+name: Build and Push `geocache`
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  PROJECT_ID: gravitate-registry
+  REGION: us-central1
+  APP_NAME: geocache
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: 'Authenticate with Google Cloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GCLOUD_REGISTRY_SECRET }}'
+
+      - name: 'Set up Google Cloud SDK'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 'Set registry host'
+        run: echo REGISTRY_HOST=${{ env.REGION }}-docker.pkg.dev >> $GITHUB_ENV
+
+      - name: 'Set base repo'
+        run: echo BASE_REPO=${{ env.REGISTRY_HOST }}/${{ env.PROJECT_ID }}/hold/ >> $GITHUB_ENV
+
+      - name: 'Set Image Tag'
+        run: echo IMAGE_TAG=${{ env.BASE_REPO }}${{ env.APP_NAME }}:${{ github.ref_name }} >> $GITHUB_ENV
+
+      - name: 'Docker auth'
+        run: gcloud auth configure-docker ${{ env.REGISTRY_HOST }} --quiet
+
+      - name: 'Build image'
+        run: |
+          docker build \
+          --tag ${{ env.IMAGE_TAG }} .
+        working-directory: ${{ github.workspace }}/
+
+      - name: Push Docker image to Google Artifact Registry
+        run: |
+          docker push ${{ env.IMAGE_TAG }}
