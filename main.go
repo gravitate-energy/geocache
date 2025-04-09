@@ -14,18 +14,19 @@ import (
 )
 
 // Constants
-const GOOGLE_MAPS_URL = "https://maps.googleapis.com"
-const CACHE_LIFETIME = "720h"
-const CACHE_CAPACITY = 10_000_000
+const googleMapsUrl = "https://maps.googleapis.com"
+const cacheLifetime = "720h"
+const cacheCapacity = 10_000_000
+const appVersion = "1.0.0"
 
 // Programs main function
 func main() {
 
-	log.Println("capacity: " + fmt.Sprintf("%d requests", CACHE_CAPACITY))
+	log.Println("capacity: " + fmt.Sprintf("%d requests", cacheCapacity))
 
 	memcached, err := memory.NewAdapter(
 		memory.AdapterWithAlgorithm(memory.LRU),
-		memory.AdapterWithCapacity(CACHE_CAPACITY),
+		memory.AdapterWithCapacity(cacheCapacity),
 	)
 
 	if err != nil {
@@ -33,7 +34,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	lifetime, err := time.ParseDuration(CACHE_LIFETIME)
+	lifetime, err := time.ParseDuration(cacheLifetime)
 
 	if err != nil {
 		fmt.Println("Failed to parse CACHE_LIFETIME: " + err.Error())
@@ -57,7 +58,7 @@ func main() {
 	// http.Handle("/", cacheClient.Middleware(corsMiddleware(handler)))
 	http.Handle("/health", logger(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Server is healthy"))
+		w.Write([]byte(fmt.Sprintf("ok\nversion: %s\n", appVersion)))
 	})))
 
 	http.Handle("/", cacheClient.Middleware(logger(corsMiddleware(handler))))
@@ -83,7 +84,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Google-Maps-API-Key")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Maps-API-Key")
 
 		// Handle preflight requests
 		if r.Method == http.MethodOptions {
@@ -99,7 +100,9 @@ func corsMiddleware(next http.Handler) http.Handler {
 func query(w http.ResponseWriter, r *http.Request) {
 
 	// get googleMapsAPIKey from request header
-	googleMapsAPIKey := r.Header.Get("x-google-maps-api-key")
+	googleMapsAPIKey := r.Header.Get("X-Maps-API-Key")
+
+	// get maps key from query parameter
 
 	ruri := r.URL.RequestURI()
 
@@ -107,7 +110,7 @@ func query(w http.ResponseWriter, r *http.Request) {
 		ruri += "&key=" + googleMapsAPIKey
 	}
 
-	resp, err := http.Get(GOOGLE_MAPS_URL + ruri)
+	resp, err := http.Get(googleMapsUrl + ruri)
 
 	if err != nil {
 		log.Fatal(err)
