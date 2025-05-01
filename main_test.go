@@ -4,32 +4,91 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestSetupServer(t *testing.T) {
+	// Start miniredis for a mock Redis server
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("Failed to start miniredis: %v", err)
+	}
+	defer mr.Close()
+
 	logger := NewLogger(false)
 	config := Config{
-		RedisHost:    defaultEnv.RedisHost,
-		RedisPort:    defaultEnv.RedisPort,
-		BaseURL:      defaultEnv.BaseURL,
-		CacheTimeout: defaultEnv.CacheTimeout,
+		RedisHost:    mr.Host(),
+		RedisPort:    mr.Port(),
+		BaseURL:      "https://maps.googleapis.com",
+		CacheTimeout: 720 * time.Hour,
 	}
-	rdb, err := setupRedis(config)
-	if err != nil {
-		t.Skip("Skipping test as Redis is not available:", err)
-	}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+		DB:   0,
+	})
+	defer rdb.Close()
 
 	mux := setupServer(logger, rdb, config)
 
-	// Test health endpoint
-	req := httptest.NewRequest("GET", "/health", nil)
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
+	tests := []struct {
+		name           string
+		path           string
+		method         string
+		expectedStatus int
+		headers        map[string]string
+	}{
+		{
+			name:           "health check",
+			path:           "/health",
+			method:         "GET",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "query endpoint without API key",
+			path:           "/maps/api/geocode/json?address=test",
+			method:         "GET",
+			expectedStatus: http.StatusOK, // Server forwards request to Google Maps API without validation
+		},
+		{
+			name:           "query endpoint with API key header",
+			path:           "/maps/api/geocode/json?address=test",
+			method:         "GET",
+			expectedStatus: http.StatusOK,
+			headers: map[string]string{
+				"X-Maps-API-Key": "test-key",
+			},
+		},
+		{
+			name:           "CORS preflight request",
+			path:           "/maps/api/geocode/json",
+			method:         "OPTIONS",
+			expectedStatus: http.StatusOK,
+		},
+	}
 
-	if w.Code != http.StatusOK {
-		t.Errorf("Health check failed. Expected status %d, got %d", http.StatusOK, w.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			for k, v := range tt.headers {
+				req.Header.Set(k, v)
+			}
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+
+			if w.Code != tt.expectedStatus {
+				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, w.Code)
+			}
+
+			if tt.method == "OPTIONS" {
+				if w.Header().Get("Access-Control-Allow-Origin") == "" {
+					t.Error("Expected CORS headers in response")
+				}
+			}
+		})
 	}
 }
 
