@@ -1,8 +1,10 @@
 module github.com/goodjobs/maps-api-cache
 
-go 1.15
+go 1.21
+
+require github.com/redis/go-redis/v9 v9.4.0
 
 require (
-	github.com/joho/godotenv v1.3.0
-	github.com/victorspringer/http-cache v0.0.0-20190721184638-fe78e97af707
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 )

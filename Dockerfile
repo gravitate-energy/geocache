@@ -1,10 +1,10 @@
-FROM golang:1.14
+FROM golang:1.21-alpine
 
-WORKDIR /go/src/app
+WORKDIR /app
 COPY . .
 
-RUN go get -d -v ./...
-RUN go install -v ./...
+RUN go mod download
+RUN go build -o geocache
 
 EXPOSE 8080
-CMD ["go", "run", "/go/src/app/main.go"]
+CMD ["./geocache"]

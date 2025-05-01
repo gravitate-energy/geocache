@@ -6,3 +6,28 @@ services:
     ports:
       - 8080:8080
     restart: unless-stopped
+    depends_on:
+      - redis
+    networks:
+      - geocache-network
+    environment:
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - LOG_FORMAT=${LOG_FORMAT:-standard}
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - 6379:6379
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - geocache-network
+
+networks:
+  geocache-network:
+    driver: bridge
+
+volumes:
+  redis-data:
