@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"os"
+	"time"
+)
 
 type Environment struct {
 	RedisHost  string
@@ -28,3 +31,26 @@ var (
 		Version:      "1.0.0",
 	}
 )
+
+type Config struct {
+	RedisHost  string
+	RedisPort  string
+	ServerPort string
+	LogFormat  string
+}
+
+func LoadConfig() Config {
+	return Config{
+		RedisHost:  getEnvOrDefault("REDIS_HOST", defaultEnv.RedisHost),
+		RedisPort:  getEnvOrDefault("REDIS_PORT", defaultEnv.RedisPort),
+		ServerPort: getEnvOrDefault("SERVER_PORT", defaultEnv.ServerPort),
+		LogFormat:  os.Getenv("LOG_FORMAT"),
+	}
+}
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}

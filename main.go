@@ -9,46 +9,46 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func main() {
-	logger := NewLogger(os.Getenv("LOG_FORMAT") == "gcp")
-
-	redisHost := os.Getenv("REDIS_HOST")
-	if redisHost == "" {
-		redisHost = defaultEnv.RedisHost
-	}
-
-	redisPort := os.Getenv("REDIS_PORT")
-	if redisPort == "" {
-		redisPort = defaultEnv.RedisPort
-	}
-
-	serverPort := os.Getenv("SERVER_PORT")
-	if serverPort == "" {
-		serverPort = defaultEnv.ServerPort
-	}
-
+func setupRedis(config Config) (*redis.Client, error) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr: fmt.Sprintf("%s:%s", redisHost, redisPort),
+		Addr: fmt.Sprintf("%s:%s", config.RedisHost, config.RedisPort),
 		DB:   0,
 	})
 
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		logger.log(LogCritical, "Failed to connect to Redis: %v", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("failed to connect to Redis: %v", err)
 	}
+	return rdb, nil
+}
 
+func setupServer(logger *Logger, rdb *redis.Client) *http.ServeMux {
+	mux := http.NewServeMux()
 	server := NewServer(logger, rdb, apiConfig, nil)
 
-	http.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(fmt.Sprintf("ok\nversion: %s\n", apiConfig.Version)))
 	}))
 
-	http.Handle("/", server.logMiddleware(corsMiddleware(http.HandlerFunc(server.query))))
+	mux.Handle("/", server.logMiddleware(corsMiddleware(http.HandlerFunc(server.query))))
+	return mux
+}
 
-	addr := fmt.Sprintf(":%s", serverPort)
+func main() {
+	config := LoadConfig()
+	logger := NewLogger(config.LogFormat == "gcp")
+
+	rdb, err := setupRedis(config)
+	if err != nil {
+		logger.log(LogCritical, err.Error())
+		os.Exit(1)
+	}
+
+	mux := setupServer(logger, rdb)
+
+	addr := fmt.Sprintf(":%s", config.ServerPort)
 	logger.log(LogInfo, "Starting server on %s", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := http.ListenAndServe(addr, mux); err != nil {
 		logger.log(LogCritical, "Server failed: %v", err)
 		os.Exit(1)
 	}
