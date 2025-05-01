@@ -39,7 +39,7 @@ func setupTestServer(t *testing.T, mockClient *http.Client) (*Server, *miniredis
 	})
 
 	logger := &Logger{useGCP: false}
-	config := APIConfig{
+	config := Config{
 		BaseURL:      "https://maps.googleapis.com/maps/api",
 		CacheTimeout: time.Hour,
 	}
@@ -232,7 +232,7 @@ func TestServer_Query_RedisCacheError(t *testing.T) {
 	})
 
 	logger := &Logger{useGCP: false}
-	config := APIConfig{
+	config := Config{
 		BaseURL:      "https://maps.googleapis.com/maps/api",
 		CacheTimeout: time.Hour,
 	}
@@ -346,7 +346,7 @@ func TestQueryResponseBodyReadError(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{})
 
 	// Setup config
-	config := APIConfig{
+	config := Config{
 		BaseURL:      "http://example.com",
 		CacheTimeout: 0,
 	}

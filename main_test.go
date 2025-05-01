@@ -10,15 +10,18 @@ import (
 
 func TestSetupServer(t *testing.T) {
 	logger := NewLogger(false)
-	rdb, err := setupRedis(Config{
-		RedisHost: defaultEnv.RedisHost,
-		RedisPort: defaultEnv.RedisPort,
-	})
+	config := Config{
+		RedisHost:    defaultEnv.RedisHost,
+		RedisPort:    defaultEnv.RedisPort,
+		BaseURL:      defaultEnv.BaseURL,
+		CacheTimeout: defaultEnv.CacheTimeout,
+	}
+	rdb, err := setupRedis(config)
 	if err != nil {
 		t.Skip("Skipping test as Redis is not available:", err)
 	}
 
-	mux := setupServer(logger, rdb)
+	mux := setupServer(logger, rdb, config)
 
 	// Test health endpoint
 	req := httptest.NewRequest("GET", "/health", nil)

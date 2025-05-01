@@ -18,11 +18,11 @@ import (
 type Server struct {
 	logger     *Logger
 	redis      *redis.Client
-	config     APIConfig
+	config     Config
 	httpClient *http.Client
 }
 
-func NewServer(logger *Logger, redis *redis.Client, config APIConfig, httpClient *http.Client) *Server {
+func NewServer(logger *Logger, redis *redis.Client, config Config, httpClient *http.Client) *Server {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}

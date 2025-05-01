@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -15,25 +16,31 @@ func TestLoadConfig(t *testing.T) {
 			name:    "uses defaults when env vars not set",
 			envVars: map[string]string{},
 			expected: Config{
-				RedisHost:  defaultEnv.RedisHost,
-				RedisPort:  defaultEnv.RedisPort,
-				ServerPort: defaultEnv.ServerPort,
-				LogFormat:  "",
+				RedisHost:    defaultEnv.RedisHost,
+				RedisPort:    defaultEnv.RedisPort,
+				ServerPort:   defaultEnv.ServerPort,
+				LogFormat:    "",
+				BaseURL:      defaultEnv.BaseURL,
+				CacheTimeout: defaultEnv.CacheTimeout,
 			},
 		},
 		{
 			name: "uses environment variables when set",
 			envVars: map[string]string{
-				"REDIS_HOST":  "custom-redis",
-				"REDIS_PORT":  "6380",
-				"SERVER_PORT": "8081",
-				"LOG_FORMAT":  "gcp",
+				"REDIS_HOST":          "custom-redis",
+				"REDIS_PORT":          "6380",
+				"SERVER_PORT":         "8081",
+				"LOG_FORMAT":          "gcp",
+				"BASE_URL":            "https://custom-maps.example.com",
+				"CACHE_TIMEOUT_HOURS": "48",
 			},
 			expected: Config{
-				RedisHost:  "custom-redis",
-				RedisPort:  "6380",
-				ServerPort: "8081",
-				LogFormat:  "gcp",
+				RedisHost:    "custom-redis",
+				RedisPort:    "6380",
+				ServerPort:   "8081",
+				LogFormat:    "gcp",
+				BaseURL:      "https://custom-maps.example.com",
+				CacheTimeout: 48 * time.Hour,
 			},
 		},
 	}
@@ -61,6 +68,12 @@ func TestLoadConfig(t *testing.T) {
 			}
 			if config.LogFormat != tt.expected.LogFormat {
 				t.Errorf("LogFormat = %v, want %v", config.LogFormat, tt.expected.LogFormat)
+			}
+			if config.BaseURL != tt.expected.BaseURL {
+				t.Errorf("BaseURL = %v, want %v", config.BaseURL, tt.expected.BaseURL)
+			}
+			if config.CacheTimeout != tt.expected.CacheTimeout {
+				t.Errorf("CacheTimeout = %v, want %v", config.CacheTimeout, tt.expected.CacheTimeout)
 			}
 		})
 	}

@@ -2,49 +2,56 @@ package main
 
 import (
 	"os"
+	"strconv"
 	"time"
 )
 
 type Environment struct {
-	RedisHost  string
-	RedisPort  string
-	LogFormat  string
-	ServerPort string
+	RedisHost    string
+	RedisPort    string
+	LogFormat    string
+	ServerPort   string
+	BaseURL      string
+	CacheTimeout time.Duration
 }
 
 type APIConfig struct {
-	BaseURL      string
-	CacheTimeout time.Duration
-	Version      string
+	Version string
 }
 
 var (
 	defaultEnv = Environment{
-		RedisHost:  "redis",
-		RedisPort:  "6379",
-		ServerPort: "80",
+		RedisHost:    "redis",
+		RedisPort:    "6379",
+		ServerPort:   "80",
+		BaseURL:      "https://maps.googleapis.com",
+		CacheTimeout: 720 * time.Hour,
 	}
 
 	apiConfig = APIConfig{
-		BaseURL:      "https://maps.googleapis.com",
-		CacheTimeout: 720 * time.Hour,
-		Version:      "1.0.0",
+		Version: "1.0.0",
 	}
 )
 
 type Config struct {
-	RedisHost  string
-	RedisPort  string
-	ServerPort string
-	LogFormat  string
+	RedisHost    string
+	RedisPort    string
+	ServerPort   string
+	LogFormat    string
+	BaseURL      string
+	CacheTimeout time.Duration
 }
 
 func LoadConfig() Config {
+	cacheTimeoutHours, _ := strconv.ParseInt(getEnvOrDefault("CACHE_TIMEOUT_HOURS", "720"), 10, 64)
+
 	return Config{
-		RedisHost:  getEnvOrDefault("REDIS_HOST", defaultEnv.RedisHost),
-		RedisPort:  getEnvOrDefault("REDIS_PORT", defaultEnv.RedisPort),
-		ServerPort: getEnvOrDefault("SERVER_PORT", defaultEnv.ServerPort),
-		LogFormat:  os.Getenv("LOG_FORMAT"),
+		RedisHost:    getEnvOrDefault("REDIS_HOST", defaultEnv.RedisHost),
+		RedisPort:    getEnvOrDefault("REDIS_PORT", defaultEnv.RedisPort),
+		ServerPort:   getEnvOrDefault("SERVER_PORT", defaultEnv.ServerPort),
+		LogFormat:    os.Getenv("LOG_FORMAT"),
+		BaseURL:      getEnvOrDefault("BASE_URL", defaultEnv.BaseURL),
+		CacheTimeout: time.Duration(cacheTimeoutHours) * time.Hour,
 	}
 }
 

@@ -21,9 +21,9 @@ func setupRedis(config Config) (*redis.Client, error) {
 	return rdb, nil
 }
 
-func setupServer(logger *Logger, rdb *redis.Client) *http.ServeMux {
+func setupServer(logger *Logger, rdb *redis.Client, config Config) *http.ServeMux {
 	mux := http.NewServeMux()
-	server := NewServer(logger, rdb, apiConfig, nil)
+	server := NewServer(logger, rdb, config, nil)
 
 	mux.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -44,7 +44,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	mux := setupServer(logger, rdb)
+	mux := setupServer(logger, rdb, config)
 
 	addr := fmt.Sprintf(":%s", config.ServerPort)
 	logger.log(LogInfo, "Starting server on %s", addr)

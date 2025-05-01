@@ -207,7 +207,11 @@ func TestLoggerMiddlewareOutput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := NewLogger(tt.useGCP)
-			server := NewServer(logger, nil, APIConfig{}, nil)
+			config := Config{
+				BaseURL:      "https://maps.googleapis.com",
+				CacheTimeout: time.Hour,
+			}
+			server := NewServer(logger, nil, config, nil)
 
 			// Create a test request to exercise the middleware
 			req := httptest.NewRequest(tt.method, tt.path, nil)
