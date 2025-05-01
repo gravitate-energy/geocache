@@ -97,13 +97,17 @@ func (s *Server) logMiddleware(next http.Handler) http.Handler {
 				ip = r.RemoteAddr
 			}
 
+			sw := newStatusResponseWriter(w)
+			next.ServeHTTP(sw, r)
+
 			entry := logEntry{
-				Message:   fmt.Sprintf("%s %s", r.Method, r.URL.Path),
-				Severity:  LogInfo,
-				Timestamp: time.Now(),
-				IP:        ip,
-				Method:    r.Method,
-				Path:      r.URL.Path,
+				Message:    fmt.Sprintf("%s %s", r.Method, r.URL.Path),
+				Severity:   LogInfo,
+				Timestamp:  time.Now(),
+				IP:         ip,
+				Method:     r.Method,
+				Path:       r.URL.Path,
+				StatusCode: sw.statusCode,
 			}
 
 			if s.logger.useGCP {
@@ -111,8 +115,9 @@ func (s *Server) logMiddleware(next http.Handler) http.Handler {
 					fmt.Println(string(b))
 				}
 			} else {
-				log.Printf("%s [%s] %s", ip, r.Method, r.URL.Path)
+				log.Printf("%s [%s] %s - %d", ip, r.Method, r.URL.Path, sw.statusCode)
 			}
+			return
 		}
 		next.ServeHTTP(w, r)
 	})

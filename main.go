@@ -30,7 +30,7 @@ func setupServer(logger *Logger, rdb *redis.Client, config Config) *http.ServeMu
 		w.Write([]byte(fmt.Sprintf("ok\nversion: %s\n", apiConfig.Version)))
 	}))
 
-	mux.Handle("/", server.logMiddleware(corsMiddleware(http.HandlerFunc(server.query))))
+	mux.Handle("/", server.logMiddleware(http.HandlerFunc(server.query)))
 	return mux
 }
 
@@ -48,7 +48,7 @@ func main() {
 
 	addr := fmt.Sprintf(":%s", config.ServerPort)
 	logger.log(LogInfo, "Starting server on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := http.ListenAndServe(addr, corsMiddleware(mux)); err != nil {
 		logger.log(LogCritical, "Server failed: %v", err)
 		os.Exit(1)
 	}

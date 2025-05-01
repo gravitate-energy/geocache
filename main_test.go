@@ -33,6 +33,7 @@ func TestSetupServer(t *testing.T) {
 	defer rdb.Close()
 
 	mux := setupServer(logger, rdb, config)
+	handler := corsMiddleware(mux) // Wrap mux with CORS middleware
 
 	tests := []struct {
 		name           string
@@ -77,7 +78,7 @@ func TestSetupServer(t *testing.T) {
 				req.Header.Set(k, v)
 			}
 			w := httptest.NewRecorder()
-			mux.ServeHTTP(w, req)
+			handler.ServeHTTP(w, req) // Use handler instead of mux
 
 			if w.Code != tt.expectedStatus {
 				t.Errorf("Expected status code %d, got %d", tt.expectedStatus, w.Code)

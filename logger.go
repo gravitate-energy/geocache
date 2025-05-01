@@ -21,13 +21,14 @@ type Logger struct {
 }
 
 type logEntry struct {
-	Message   string      `json:"message"`
-	Severity  LogSeverity `json:"severity"`
-	Timestamp time.Time   `json:"timestamp"`
-	IP        string      `json:"ip,omitempty"`
-	Method    string      `json:"method,omitempty"`
-	Path      string      `json:"path,omitempty"`
-	Error     string      `json:"error,omitempty"`
+	Message    string      `json:"message"`
+	Severity   LogSeverity `json:"severity"`
+	Timestamp  time.Time   `json:"timestamp"`
+	IP         string      `json:"ip,omitempty"`
+	Method     string      `json:"method,omitempty"`
+	Path       string      `json:"path,omitempty"`
+	Error      string      `json:"error,omitempty"`
+	StatusCode int         `json:"status_code,omitempty"`
 }
 
 func NewLogger(useGCP bool) *Logger {
