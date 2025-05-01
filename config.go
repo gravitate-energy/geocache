@@ -13,6 +13,8 @@ type Environment struct {
 	ServerPort   string
 	BaseURL      string
 	CacheTimeout time.Duration
+	RedisDB      int
+	RedisPrefix  string
 }
 
 type APIConfig struct {
@@ -26,6 +28,8 @@ var (
 		ServerPort:   "80",
 		BaseURL:      "https://maps.googleapis.com",
 		CacheTimeout: 720 * time.Hour,
+		RedisDB:      0,
+		RedisPrefix:  "",
 	}
 
 	apiConfig = APIConfig{
@@ -40,10 +44,13 @@ type Config struct {
 	LogFormat    string
 	BaseURL      string
 	CacheTimeout time.Duration
+	RedisDB      int
+	RedisPrefix  string
 }
 
 func LoadConfig() Config {
 	cacheTimeoutHours, _ := strconv.ParseInt(getEnvOrDefault("CACHE_TIMEOUT_HOURS", "720"), 10, 64)
+	redisDB, _ := strconv.Atoi(getEnvOrDefault("REDIS_DB", "0"))
 
 	return Config{
 		RedisHost:    getEnvOrDefault("REDIS_HOST", defaultEnv.RedisHost),
@@ -52,6 +59,8 @@ func LoadConfig() Config {
 		LogFormat:    os.Getenv("LOG_FORMAT"),
 		BaseURL:      getEnvOrDefault("BASE_URL", defaultEnv.BaseURL),
 		CacheTimeout: time.Duration(cacheTimeoutHours) * time.Hour,
+		RedisDB:      redisDB,
+		RedisPrefix:  getEnvOrDefault("REDIS_PREFIX", defaultEnv.RedisPrefix),
 	}
 }
 

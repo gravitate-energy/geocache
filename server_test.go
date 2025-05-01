@@ -33,16 +33,20 @@ func setupTestServer(t *testing.T, mockClient *http.Client) (*Server, *miniredis
 		t.Fatalf("Failed to create miniredis: %v", err)
 	}
 
-	// Create a Redis client connected to the mock server
-	rdb := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
-	})
-
-	logger := &Logger{useGCP: false}
 	config := Config{
 		BaseURL:      "https://maps.googleapis.com/maps/api",
 		CacheTimeout: time.Hour,
+		RedisDB:      0,
+		RedisPrefix:  "test",
 	}
+
+	// Create a Redis client connected to the mock server
+	rdb := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+		DB:   config.RedisDB,
+	})
+
+	logger := &Logger{useGCP: false}
 
 	server := NewServer(logger, rdb, config, mockClient)
 
@@ -56,20 +60,30 @@ func setupTestServer(t *testing.T, mockClient *http.Client) (*Server, *miniredis
 
 func TestGetCacheKey(t *testing.T) {
 	tests := []struct {
-		name string
-		path string
+		name   string
+		path   string
+		prefix string
+		want   string
 	}{
 		{
-			name: "simple path",
-			path: "/query?location=NewYork",
+			name:   "simple path no prefix",
+			path:   "/query?location=NewYork",
+			prefix: "",
 		},
 		{
-			name: "empty path",
-			path: "/",
+			name:   "simple path with prefix",
+			path:   "/query?location=NewYork",
+			prefix: "test",
 		},
 		{
-			name: "path with multiple params",
-			path: "/query?location=NewYork&radius=10&type=restaurant",
+			name:   "empty path with prefix",
+			path:   "/",
+			prefix: "prod",
+		},
+		{
+			name:   "path with multiple params and prefix",
+			path:   "/query?location=NewYork&radius=10&type=restaurant",
+			prefix: "staging",
 		},
 	}
 
@@ -78,14 +92,14 @@ func TestGetCacheKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
-			got := getCacheKey(req)
+			got := getCacheKey(req, tt.prefix)
 
 			if got == "" {
 				t.Error("getCacheKey() returned empty string")
 			}
 
-			if len(got) != 64 {
-				t.Errorf("getCacheKey() returned hash of length %d, want 64", len(got))
+			if tt.prefix != "" && !strings.HasPrefix(got, tt.prefix+":") {
+				t.Errorf("getCacheKey() = %q, want prefix %q:", got, tt.prefix)
 			}
 
 			if prev, exists := seen[got]; exists {
@@ -93,7 +107,7 @@ func TestGetCacheKey(t *testing.T) {
 			}
 			seen[got] = tt.path
 
-			got2 := getCacheKey(req)
+			got2 := getCacheKey(req, tt.prefix)
 			if got != got2 {
 				t.Errorf("getCacheKey() not consistent for same input. First call: %v, Second call: %v", got, got2)
 			}
@@ -108,7 +122,7 @@ func TestServer_Query_CacheHit(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/query?location=TestLocation", nil)
 	w := httptest.NewRecorder()
 
-	cacheKey := getCacheKey(req)
+	cacheKey := getCacheKey(req, server.config.RedisPrefix)
 	testData := `{"test": "data"}`
 	mr.Set(cacheKey, testData)
 	mr.SetTTL(cacheKey, time.Hour)
@@ -150,7 +164,7 @@ func TestServer_Query_CacheMiss(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/query?location=TestLocation", nil)
 	w := httptest.NewRecorder()
 
-	cacheKey := getCacheKey(req)
+	cacheKey := getCacheKey(req, server.config.RedisPrefix)
 	mr.Del(cacheKey)
 
 	server.query(w, req)
@@ -227,15 +241,19 @@ func TestServer_Query_RedisCacheError(t *testing.T) {
 		t.Fatalf("Failed to create miniredis: %v", err)
 	}
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
-	})
-
-	logger := &Logger{useGCP: false}
 	config := Config{
 		BaseURL:      "https://maps.googleapis.com/maps/api",
 		CacheTimeout: time.Hour,
+		RedisDB:      0,
+		RedisPrefix:  "test",
 	}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+		DB:   config.RedisDB,
+	})
+
+	logger := &Logger{useGCP: false}
 
 	server := NewServer(logger, rdb, config, mockClient)
 

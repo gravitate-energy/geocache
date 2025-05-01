@@ -11,6 +11,7 @@ A high-performance Google Maps API caching server that reduces the number of que
 - CORS support
 - Health check endpoint
 - Docker and docker-compose support
+- Multi-server support with Redis DB selection and key prefixing
 
 ## Installation with docker-compose
 
@@ -22,10 +23,43 @@ A high-performance Google Maps API caching server that reduces the number of que
 
 - `REDIS_HOST`: Redis server hostname (default: "redis")
 - `REDIS_PORT`: Redis server port (default: "6379")
+- `REDIS_DB`: Redis database number to use (default: 0)
+- `REDIS_PREFIX`: Prefix for cache keys, useful for multi-server setups (default: "")
 - `SERVER_PORT`: Port for the geocache server (default: "80")
 - `BASE_URL`: Base URL for Google Maps API (default: "https://maps.googleapis.com")
 - `CACHE_TIMEOUT_HOURS`: Cache entry lifetime in hours (default: 720 hours/30 days)
 - `LOG_FORMAT`: Logging format, set to "gcp" for Google Cloud Platform format (default: standard logging)
+
+## Multi-Server Configuration
+
+You can run multiple instances of the server using the same Redis instance by configuring different database numbers or key prefixes:
+
+### Using Different Redis Databases
+```bash
+# Production server using Redis DB 1
+REDIS_DB=1 ./server
+
+# Staging server using Redis DB 2
+REDIS_DB=2 ./server
+```
+
+### Using Key Prefixes
+```bash
+# Production server with 'prod' prefix
+REDIS_PREFIX=prod ./server
+
+# Staging server with 'staging' prefix
+REDIS_PREFIX=staging ./server
+```
+
+You can also combine both approaches:
+```bash
+# Production server on DB 1 with 'prod' prefix
+REDIS_DB=1 REDIS_PREFIX=prod ./server
+
+# Staging server on DB 2 with 'staging' prefix
+REDIS_DB=2 REDIS_PREFIX=staging ./server
+```
 
 ## API Usage
 
@@ -64,12 +98,16 @@ If you see Redis connection errors:
 1. Check that Redis is running: `docker-compose ps`
 2. Verify Redis host and port in your environment variables
 3. Check Redis logs: `docker-compose logs redis`
+4. Verify the Redis DB number is valid and accessible
+5. Check that the Redis prefix (if used) follows Redis key naming conventions
 
 ### Cache Not Working
 
 1. Verify Redis is running and accessible
 2. Check the request URL matches exactly (including query parameters)
 3. Verify cache timeout setting isn't set too low
+4. If using prefixes, check that the prefix is being applied correctly
+5. Verify you're connecting to the correct Redis database number
 
 ## Legal Considerations
 

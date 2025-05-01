@@ -26,6 +26,7 @@ func NewServer(logger *Logger, redis *redis.Client, config Config, httpClient *h
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
+
 	return &Server{
 		logger:     logger,
 		redis:      redis,
@@ -34,14 +35,18 @@ func NewServer(logger *Logger, redis *redis.Client, config Config, httpClient *h
 	}
 }
 
-func getCacheKey(r *http.Request) string {
+func getCacheKey(r *http.Request, prefix string) string {
 	h := sha256.New()
 	h.Write([]byte(r.URL.RequestURI()))
-	return hex.EncodeToString(h.Sum(nil))
+	key := hex.EncodeToString(h.Sum(nil))
+	if prefix != "" {
+		return prefix + ":" + key
+	}
+	return key
 }
 
 func (s *Server) query(w http.ResponseWriter, r *http.Request) {
-	cacheKey := getCacheKey(r)
+	cacheKey := getCacheKey(r, s.config.RedisPrefix)
 
 	if cachedResponse, err := s.redis.Get(context.Background(), cacheKey).Result(); err == nil {
 		w.Header().Set("Content-Type", "application/json")

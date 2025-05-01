@@ -22,6 +22,8 @@ func TestLoadConfig(t *testing.T) {
 				LogFormat:    "",
 				BaseURL:      defaultEnv.BaseURL,
 				CacheTimeout: defaultEnv.CacheTimeout,
+				RedisDB:      defaultEnv.RedisDB,
+				RedisPrefix:  defaultEnv.RedisPrefix,
 			},
 		},
 		{
@@ -33,6 +35,8 @@ func TestLoadConfig(t *testing.T) {
 				"LOG_FORMAT":          "gcp",
 				"BASE_URL":            "https://custom-maps.example.com",
 				"CACHE_TIMEOUT_HOURS": "48",
+				"REDIS_DB":            "2",
+				"REDIS_PREFIX":        "prod",
 			},
 			expected: Config{
 				RedisHost:    "custom-redis",
@@ -41,6 +45,8 @@ func TestLoadConfig(t *testing.T) {
 				LogFormat:    "gcp",
 				BaseURL:      "https://custom-maps.example.com",
 				CacheTimeout: 48 * time.Hour,
+				RedisDB:      2,
+				RedisPrefix:  "prod",
 			},
 		},
 	}
@@ -74,6 +80,12 @@ func TestLoadConfig(t *testing.T) {
 			}
 			if config.CacheTimeout != tt.expected.CacheTimeout {
 				t.Errorf("CacheTimeout = %v, want %v", config.CacheTimeout, tt.expected.CacheTimeout)
+			}
+			if config.RedisDB != tt.expected.RedisDB {
+				t.Errorf("RedisDB = %v, want %v", config.RedisDB, tt.expected.RedisDB)
+			}
+			if config.RedisPrefix != tt.expected.RedisPrefix {
+				t.Errorf("RedisPrefix = %v, want %v", config.RedisPrefix, tt.expected.RedisPrefix)
 			}
 		})
 	}
