@@ -1,0 +1,38 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Go build and debug
+bin/
+pkg/
+debug/
+
+# Load Testing (Python)
+load_testing/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Development
+.git/
+.gitignore
+.env
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Docker
+.docker/
+Dockerfile*
+docker-compose*.yml
+
+# Keep
+!README.md 
