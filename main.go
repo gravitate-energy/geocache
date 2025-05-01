@@ -22,6 +22,11 @@ func main() {
 		redisPort = defaultEnv.RedisPort
 	}
 
+	serverPort := os.Getenv("SERVER_PORT")
+	if serverPort == "" {
+		serverPort = defaultEnv.ServerPort
+	}
+
 	rdb := redis.NewClient(&redis.Options{
 		Addr: fmt.Sprintf("%s:%s", redisHost, redisPort),
 		DB:   0,
@@ -32,7 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	server := NewServer(logger, rdb, apiConfig)
+	server := NewServer(logger, rdb, apiConfig, nil)
 
 	http.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -41,8 +46,9 @@ func main() {
 
 	http.Handle("/", server.logMiddleware(corsMiddleware(http.HandlerFunc(server.query))))
 
-	logger.log(LogInfo, "Starting server on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	addr := fmt.Sprintf(":%s", serverPort)
+	logger.log(LogInfo, "Starting server on %s", addr)
+	if err := http.ListenAndServe(addr, nil); err != nil {
 		logger.log(LogCritical, "Server failed: %v", err)
 		os.Exit(1)
 	}

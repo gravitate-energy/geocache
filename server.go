@@ -16,16 +16,21 @@ import (
 )
 
 type Server struct {
-	logger *Logger
-	redis  *redis.Client
-	config APIConfig
+	logger     *Logger
+	redis      *redis.Client
+	config     APIConfig
+	httpClient *http.Client
 }
 
-func NewServer(logger *Logger, redis *redis.Client, config APIConfig) *Server {
+func NewServer(logger *Logger, redis *redis.Client, config APIConfig, httpClient *http.Client) *Server {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
 	return &Server{
-		logger: logger,
-		redis:  redis,
-		config: config,
+		logger:     logger,
+		redis:      redis,
+		config:     config,
+		httpClient: httpClient,
 	}
 }
 
@@ -52,7 +57,7 @@ func (s *Server) query(w http.ResponseWriter, r *http.Request) {
 		ruri += "&key=" + googleMapsAPIKey
 	}
 
-	resp, err := http.Get(s.config.BaseURL + ruri)
+	resp, err := s.httpClient.Get(s.config.BaseURL + ruri)
 	if err != nil {
 		s.logger.log(LogError, "Failed to fetch from Google Maps API: %v", err)
 		http.Error(w, "Failed to fetch from Google Maps API", http.StatusInternalServerError)

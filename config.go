@@ -3,9 +3,10 @@ package main
 import "time"
 
 type Environment struct {
-	RedisHost string
-	RedisPort string
-	LogFormat string
+	RedisHost  string
+	RedisPort  string
+	LogFormat  string
+	ServerPort string
 }
 
 type APIConfig struct {
@@ -16,8 +17,9 @@ type APIConfig struct {
 
 var (
 	defaultEnv = Environment{
-		RedisHost: "redis",
-		RedisPort: "6379",
+		RedisHost:  "redis",
+		RedisPort:  "6379",
+		ServerPort: "80",
 	}
 
 	apiConfig = APIConfig{
