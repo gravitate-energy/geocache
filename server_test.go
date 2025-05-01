@@ -319,3 +319,67 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Errorf("Expected body %q, got %q", expectedBody, w.Body.String())
 	}
 }
+
+type errorReader struct{}
+
+func (er errorReader) Read(p []byte) (int, error) {
+	return 0, io.ErrUnexpectedEOF
+}
+
+func (er errorReader) Close() error {
+	return nil
+}
+
+type mockTransport struct {
+	response *http.Response
+}
+
+func (m *mockTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return m.response, nil
+}
+
+func TestQueryResponseBodyReadError(t *testing.T) {
+	// Setup mock logger
+	logger := &Logger{useGCP: false}
+
+	// Setup mock Redis client
+	rdb := redis.NewClient(&redis.Options{})
+
+	// Setup config
+	config := APIConfig{
+		BaseURL:      "http://example.com",
+		CacheTimeout: 0,
+	}
+
+	// Create mock response with error reader
+	mockResp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       errorReader{},
+		Header:     make(http.Header),
+	}
+
+	// Setup mock HTTP client
+	mockClient := &http.Client{
+		Transport: &mockTransport{response: mockResp},
+	}
+
+	// Create server instance
+	server := NewServer(logger, rdb, config, mockClient)
+
+	// Create test request
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	w := httptest.NewRecorder()
+
+	// Execute request
+	server.query(w, req)
+
+	// Verify response
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status code %d, got %d", http.StatusInternalServerError, w.Code)
+	}
+
+	expectedBody := "Failed to read response body\n"
+	if w.Body.String() != expectedBody {
+		t.Errorf("Expected body %q, got %q", expectedBody, w.Body.String())
+	}
+}
