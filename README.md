@@ -1,46 +1,84 @@
 # Google Maps API Cache
-hello world
 
-Google Maps API caching server to reduce the amount of queries which are hammered against the google maps api. The proxy just caches duplicate requests. The project is fully complient to the google maps api guidelines and it adds a privacy layer for client side api calls.
+A high-performance Google Maps API caching server that reduces the number of queries made to the Google Maps API. The proxy caches duplicate requests using Redis and is fully compliant with Google Maps API guidelines. It also adds a privacy layer for client-side API calls.
 
-## Install with docker-compose
+## Features
 
-1. copy the .env.local file to .env and change the params to your desire
-2. run `docker-compose up -d` to start the server on port 8080.
-3. run the queries you would run against the google maps api on http://localhost:8080/
+- Redis-based caching for high performance and reliability
+- Configurable cache timeout (up to 30 days as per Google's guidelines)
+- Support for custom base URLs
+- GCP-compatible logging
+- CORS support
+- Health check endpoint
+- Docker and docker-compose support
 
-## Options in the .env file
+## Installation with docker-compose
 
-- GOOGLE_MAPS_API_KEY: your google maps api key. If you set this in the env, you dont need to pass it on your requests
-- CACHE_LIFETIME: the lifetime of the cache entries. 720h is 30 days, which is the maximum allowed by google. You can put in any value that parse duration can parse (https://golang.org/pkg/time/#ParseDuration)
-- CACHE_CAPACITY: the max number of entries in the cache
+1. Create a `.env` file with your desired configuration (see Environment Variables section below)
+2. Run `docker-compose up -d` to start the server and Redis
+3. Make your Google Maps API queries to `http://localhost/`
 
-## You need a feature?
+## Environment Variables
 
-If you need a feature, add it! The state of the project fits my needs, so i dont have any desire adding features myself. If you find any bugs, put them in the issue tracker and i will fix them if i find time. 
+- `REDIS_HOST`: Redis server hostname (default: "redis")
+- `REDIS_PORT`: Redis server port (default: "6379")
+- `SERVER_PORT`: Port for the geocache server (default: "80")
+- `BASE_URL`: Base URL for Google Maps API (default: "https://maps.googleapis.com")
+- `CACHE_TIMEOUT_HOURS`: Cache entry lifetime in hours (default: 720 hours/30 days)
+- `LOG_FORMAT`: Logging format, set to "gcp" for Google Cloud Platform format (default: standard logging)
 
-Whatever, you can fork this repo at any given time and add features by yourself or make a pull request.
+## API Usage
 
-## Caution!
+You can pass your Google Maps API key in one of two ways:
+1. Include it in the request URL as a query parameter
+2. Pass it in the `X-Maps-API-Key` header
 
-Google allows you to cache results for a period of 30 days, so using this proxy should be legal by there own terms (https://developers.google.com/maps/premium/optimize-web-services). Whatever, you are responsible for what you are doing!
+The server will cache responses based on the request path and parameters. Subsequent identical requests will be served from the cache until the cache timeout is reached.
 
-You can save money using this proxy, but if and how much depends on what your doing, so dont nail me down on that.
+### Response Headers
 
-## Problems
+- `X-Cache`: Indicates if the response was served from cache ("HIT") or from the Google Maps API ("MISS")
+- Standard CORS headers are included for browser compatibility
 
-### The server says "open .env: no such file or directory
+## Development
 
-This means you didnt read the installation instructions or the docker container has to be rebuild to include your .env file. To rebuild the container run `docker-compose build --no-cache`. After that you should be able to start the server.
+The project is written in Go 1.21+ and uses:
+- [go-redis/v9](https://github.com/redis/go-redis) for Redis integration
+- Standard Go HTTP server for handling requests
 
-### I want to change the port
+## Docker Configuration
 
-You can change the port for the server by changing the port value inside the docker-compose file.
+The included `docker-compose.yml` sets up both the geocache server and Redis. The Redis data is persisted using a named volume.
 
-### What is docker-compose and what do i need to install to get this running?
+To modify the server port, update the ports mapping in `docker-compose.yml`:
+```yaml
+ports:
+  - "your-port:80"
+```
 
-Please read https://docs.docker.com/compose/ for more informations on this.
+## Troubleshooting
 
-## I want to give you money, because you saved me lot of money on google api billing!
+### Redis Connection Issues
 
-Feel free to buy me a coffee or and say something nice at https://www.buymeacoffee.com/maxman, so i can build more helpfull stuff in the future!# geocache
+If you see Redis connection errors:
+1. Check that Redis is running: `docker-compose ps`
+2. Verify Redis host and port in your environment variables
+3. Check Redis logs: `docker-compose logs redis`
+
+### Cache Not Working
+
+1. Verify Redis is running and accessible
+2. Check the request URL matches exactly (including query parameters)
+3. Verify cache timeout setting isn't set too low
+
+## Legal Considerations
+
+Google allows caching of results for up to 30 days according to their terms (https://developers.google.com/maps/premium/optimize-web-services). You are responsible for ensuring your usage complies with Google's terms of service.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+## License
+
+This project is open source and available under the MIT License.
