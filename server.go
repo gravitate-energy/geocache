@@ -8,10 +8,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -20,6 +23,11 @@ type Server struct {
 	redis      *redis.Client
 	config     Config
 	httpClient *http.Client
+	influx     influxdb2.Client
+	bucket     string
+	org        string
+	token      string
+	influxURL  string
 }
 
 func NewServer(logger *Logger, redis *redis.Client, config Config, httpClient *http.Client) *Server {
@@ -27,12 +35,91 @@ func NewServer(logger *Logger, redis *redis.Client, config Config, httpClient *h
 		httpClient = http.DefaultClient
 	}
 
+	var influx influxdb2.Client
+	var bucket, org, token, influxURL string
+	if config.InfluxDSN != "" && config.InfluxSampleRate > 0 {
+		dsn, err := url.Parse(config.InfluxDSN)
+		if err == nil {
+			influxURL = dsn.Scheme + "://" + dsn.Host
+			q := dsn.Query()
+			bucket = q.Get("bucket")
+			org = q.Get("org")
+			if org == "" {
+				org = "ignored"
+			}
+			token = q.Get("token")
+			if influxURL != "" && token != "" && bucket != "" {
+				influx = influxdb2.NewClient(influxURL, token)
+				writeAPI := influx.WriteAPI(org, bucket)
+				go func() {
+					for err := range writeAPI.Errors() {
+						if logger != nil {
+							logger.log(LogWarning, "InfluxDB write error: %v", err)
+						} else {
+							fmt.Println("InfluxDB write error:", err)
+						}
+					}
+				}()
+			}
+		}
+	}
+
 	return &Server{
 		logger:     logger,
 		redis:      redis,
 		config:     config,
 		httpClient: httpClient,
+		influx:     influx,
+		bucket:     bucket,
+		org:        org,
+		token:      token,
+		influxURL:  influxURL,
 	}
+}
+
+func (s *Server) recordCacheEvent(event string, r *http.Request, cacheKey string) {
+	if s.influx == nil || s.config.InfluxSampleRate <= 0 {
+		return
+	}
+	if rand.Float64() > s.config.InfluxSampleRate {
+		return
+	}
+	apiKey := extractAPIKey(r)
+	obfuscatedKey := obfuscateAPIKey(apiKey)
+	if obfuscatedKey == "" {
+		return
+	}
+	writeAPI := s.influx.WriteAPIBlocking(s.org, s.bucket)
+	p := influxdb2.NewPoint(
+		"cache_event",
+		map[string]string{"event": event},
+		map[string]interface{}{
+			"api":       r.URL.Path,
+			"api_key":   obfuscatedKey,
+			"cache_key": cacheKey,
+		},
+		time.Now(),
+	)
+	_ = writeAPI.WritePoint(context.Background(), p)
+}
+
+func extractAPIKey(r *http.Request) string {
+	key := r.Header.Get("X-Maps-API-Key")
+	if key != "" {
+		return key
+	}
+	q := r.URL.Query()
+	if k := q.Get("key"); k != "" {
+		return k
+	}
+	return ""
+}
+
+func obfuscateAPIKey(key string) string {
+	if len(key) <= 8 {
+		return key
+	}
+	return key[:4] + "..." + key[len(key)-4:]
 }
 
 func getCacheKey(r *http.Request, prefix string) string {
@@ -52,6 +139,7 @@ func (s *Server) query(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Cache", "HIT")
 		w.Write([]byte(cachedResponse))
+		s.recordCacheEvent("hit", r, cacheKey)
 		return
 	}
 
@@ -87,6 +175,7 @@ func (s *Server) query(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Alt-Svc", resp.Header.Get("alt-svc"))
 	w.Header().Set("X-Cache", "MISS")
 	w.Write(body)
+	s.recordCacheEvent("miss", r, cacheKey)
 }
 
 func (s *Server) logMiddleware(next http.Handler) http.Handler {

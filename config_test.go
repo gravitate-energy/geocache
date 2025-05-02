@@ -16,14 +16,16 @@ func TestLoadConfig(t *testing.T) {
 			name:    "uses defaults when env vars not set",
 			envVars: map[string]string{},
 			expected: Config{
-				RedisHost:    defaultEnv.RedisHost,
-				RedisPort:    defaultEnv.RedisPort,
-				ServerPort:   defaultEnv.ServerPort,
-				LogFormat:    "",
-				BaseURL:      defaultEnv.BaseURL,
-				CacheTimeout: defaultEnv.CacheTimeout,
-				RedisDB:      defaultEnv.RedisDB,
-				RedisPrefix:  defaultEnv.RedisPrefix,
+				RedisHost:        defaultEnv.RedisHost,
+				RedisPort:        defaultEnv.RedisPort,
+				ServerPort:       defaultEnv.ServerPort,
+				LogFormat:        "",
+				BaseURL:          defaultEnv.BaseURL,
+				CacheTimeout:     defaultEnv.CacheTimeout,
+				RedisDB:          defaultEnv.RedisDB,
+				RedisPrefix:      defaultEnv.RedisPrefix,
+				InfluxDSN:        defaultEnv.InfluxDSN,
+				InfluxSampleRate: defaultEnv.InfluxSampleRate,
 			},
 		},
 		{
@@ -37,16 +39,20 @@ func TestLoadConfig(t *testing.T) {
 				"CACHE_TIMEOUT_HOURS": "48",
 				"REDIS_DB":            "2",
 				"REDIS_PREFIX":        "prod",
+				"INFLUX_DSN":          "http://influxdb:8086?org=test&bucket=cache&token=abc",
+				"INFLUX_SAMPLE_RATE":  "0.25",
 			},
 			expected: Config{
-				RedisHost:    "custom-redis",
-				RedisPort:    "6380",
-				ServerPort:   "8081",
-				LogFormat:    "gcp",
-				BaseURL:      "https://custom-maps.example.com",
-				CacheTimeout: 48 * time.Hour,
-				RedisDB:      2,
-				RedisPrefix:  "prod",
+				RedisHost:        "custom-redis",
+				RedisPort:        "6380",
+				ServerPort:       "8081",
+				LogFormat:        "gcp",
+				BaseURL:          "https://custom-maps.example.com",
+				CacheTimeout:     48 * time.Hour,
+				RedisDB:          2,
+				RedisPrefix:      "prod",
+				InfluxDSN:        "http://influxdb:8086?org=test&bucket=cache&token=abc",
+				InfluxSampleRate: 0.25,
 			},
 		},
 	}
@@ -86,6 +92,12 @@ func TestLoadConfig(t *testing.T) {
 			}
 			if config.RedisPrefix != tt.expected.RedisPrefix {
 				t.Errorf("RedisPrefix = %v, want %v", config.RedisPrefix, tt.expected.RedisPrefix)
+			}
+			if config.InfluxDSN != tt.expected.InfluxDSN {
+				t.Errorf("InfluxDSN = %v, want %v", config.InfluxDSN, tt.expected.InfluxDSN)
+			}
+			if config.InfluxSampleRate != tt.expected.InfluxSampleRate {
+				t.Errorf("InfluxSampleRate = %v, want %v", config.InfluxSampleRate, tt.expected.InfluxSampleRate)
 			}
 		})
 	}

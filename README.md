@@ -29,6 +29,30 @@ A high-performance Google Maps API caching server that reduces the number of que
 - `BASE_URL`: Base URL for Google Maps API (default: "https://maps.googleapis.com")
 - `CACHE_TIMEOUT_HOURS`: Cache entry lifetime in hours (default: 720 hours/30 days)
 - `LOG_FORMAT`: Logging format, set to "gcp" for Google Cloud Platform format (default: standard logging)
+- `INFLUX_DSN`: InfluxDB connection string (DSN). Example: `http://localhost:8086?org=my-org&bucket=my-bucket&token=my-token`. If set (and sample rate > 0), cache hit/miss events will be recorded to InfluxDB.
+- `INFLUX_SAMPLE_RATE`: Float between 0 and 1. Probability of recording a cache event to InfluxDB (e.g., `0.1` for 10% sampling, `1.0` for all events, `0` disables recording).
+
+## InfluxDB Integration
+
+If you want to monitor cache hits and misses in InfluxDB, set the following environment variables:
+
+- `INFLUX_DSN`: The connection string for your InfluxDB instance. Example:
+  ```
+  http://localhost:8086?org=my-org&bucket=my-bucket&token=my-token
+  ```
+  - `org`: InfluxDB organization (required, but can be `ignored` for some setups)
+  - `bucket`: InfluxDB bucket (database/table)
+  - `token`: InfluxDB API token
+- `INFLUX_SAMPLE_RATE`: Sampling rate (float between 0 and 1). Example: `0.25` records 25% of events.
+
+When enabled, the server will record a `cache_event` measurement in InfluxDB for each cache hit or miss (according to the sample rate). Each event includes:
+
+- `event` (tag): `hit` or `miss`
+- `api` (field): the base API path (e.g., `/maps/api/geocode/json`)
+- `api_key` (field): obfuscated API key (first 4 and last 4 characters, or full key if ≤8 chars)
+- `cache_key` (field): the cache key (hash)
+
+If the API key is missing, the event is not recorded. InfluxDB errors are logged as warnings but do not affect server operation.
 
 ## Multi-Server Configuration
 
