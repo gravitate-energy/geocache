@@ -31,6 +31,7 @@ A high-performance Google Maps API caching server that reduces the number of que
 - `LOG_FORMAT`: Logging format, set to "gcp" for Google Cloud Platform format (default: standard logging)
 - `INFLUX_DSN`: InfluxDB connection string (DSN). Example: `http://localhost:8086?org=my-org&bucket=my-bucket&token=my-token`. If set (and sample rate > 0), cache hit/miss events will be recorded to InfluxDB.
 - `INFLUX_SAMPLE_RATE`: Float between 0 and 1. Probability of recording a cache event to InfluxDB (e.g., `0.1` for 10% sampling, `1.0` for all events, `0` disables recording).
+- `ALLOWED_METRICS_CIDRS`: Comma-separated list of CIDR blocks. If set, only requests from these CIDRs can access the `/metrics` endpoint. Example: `192.168.1.0/24,10.0.0.0/8`.
 
 ## InfluxDB Integration
 
@@ -53,6 +54,44 @@ When enabled, the server will record a `cache_event` measurement in InfluxDB for
 - `cache_key` (field): the cache key (hash)
 
 If the API key is missing, the event is not recorded. InfluxDB errors are logged as warnings but do not affect server operation.
+
+## Prometheus Metrics
+
+This server exposes built-in Prometheus metrics at the `/metrics` endpoint. You can scrape this endpoint with Prometheus or view it directly in your browser.
+
+**Access Control:**
+If the `ALLOWED_METRICS_CIDRS` environment variable is set, only requests from the specified CIDR ranges will be allowed to access `/metrics`. All other requests will receive a 403 Forbidden response.
+
+### Exposed Metrics
+
+- `http_requests_total{method, path, status}`: Counter for the total number of HTTP requests, labeled by HTTP method, request path, and response status code.
+- `http_request_duration_seconds{method, path}`: Histogram of HTTP request durations in seconds, labeled by method and path.
+- `redis_latency_seconds`: Histogram of Redis round-trip latencies in seconds.
+- `redis_up`: Gauge indicating if Redis is up (1) or down (0).
+
+### Example
+
+To view metrics, visit `http://localhost:80/metrics` (or your configured port).
+
+Example output:
+```
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",path="/query",status="200"} 42
+# HELP http_request_duration_seconds Duration of HTTP requests
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{method="GET",path="/query",le="0.005"} 10
+...
+# HELP redis_latency_seconds Redis round-trip latency in seconds
+# TYPE redis_latency_seconds histogram
+redis_latency_seconds_bucket{le="0.005"} 5
+...
+# HELP redis_up Whether Redis is up (1) or down (0)
+# TYPE redis_up gauge
+redis_up 1
+```
+
+You can use these metrics to monitor server health, request rates, latency, and Redis availability.
 
 ## Multi-Server Configuration
 

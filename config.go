@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -42,16 +43,17 @@ var (
 )
 
 type Config struct {
-	RedisHost        string
-	RedisPort        string
-	ServerPort       string
-	LogFormat        string
-	BaseURL          string
-	CacheTimeout     time.Duration
-	RedisDB          int
-	RedisPrefix      string
-	InfluxDSN        string
-	InfluxSampleRate float64
+	RedisHost           string
+	RedisPort           string
+	ServerPort          string
+	LogFormat           string
+	BaseURL             string
+	CacheTimeout        time.Duration
+	RedisDB             int
+	RedisPrefix         string
+	InfluxDSN           string
+	InfluxSampleRate    float64
+	AllowedMetricsCIDRs []string
 }
 
 func LoadConfig() Config {
@@ -59,17 +61,28 @@ func LoadConfig() Config {
 	redisDB, _ := strconv.Atoi(getEnvOrDefault("REDIS_DB", "0"))
 	influxSampleRate, _ := strconv.ParseFloat(getEnvOrDefault("INFLUX_SAMPLE_RATE", "0.0"), 64)
 
+	cidrs := []string{}
+	if cidrEnv := os.Getenv("ALLOWED_METRICS_CIDRS"); cidrEnv != "" {
+		for _, cidr := range strings.Split(cidrEnv, ",") {
+			trimmed := strings.TrimSpace(cidr)
+			if trimmed != "" {
+				cidrs = append(cidrs, trimmed)
+			}
+		}
+	}
+
 	return Config{
-		RedisHost:        getEnvOrDefault("REDIS_HOST", defaultEnv.RedisHost),
-		RedisPort:        getEnvOrDefault("REDIS_PORT", defaultEnv.RedisPort),
-		ServerPort:       getEnvOrDefault("SERVER_PORT", defaultEnv.ServerPort),
-		LogFormat:        os.Getenv("LOG_FORMAT"),
-		BaseURL:          getEnvOrDefault("BASE_URL", defaultEnv.BaseURL),
-		CacheTimeout:     time.Duration(cacheTimeoutHours) * time.Hour,
-		RedisDB:          redisDB,
-		RedisPrefix:      getEnvOrDefault("REDIS_PREFIX", defaultEnv.RedisPrefix),
-		InfluxDSN:        getEnvOrDefault("INFLUX_DSN", defaultEnv.InfluxDSN),
-		InfluxSampleRate: influxSampleRate,
+		RedisHost:           getEnvOrDefault("REDIS_HOST", defaultEnv.RedisHost),
+		RedisPort:           getEnvOrDefault("REDIS_PORT", defaultEnv.RedisPort),
+		ServerPort:          getEnvOrDefault("SERVER_PORT", defaultEnv.ServerPort),
+		LogFormat:           os.Getenv("LOG_FORMAT"),
+		BaseURL:             getEnvOrDefault("BASE_URL", defaultEnv.BaseURL),
+		CacheTimeout:        time.Duration(cacheTimeoutHours) * time.Hour,
+		RedisDB:             redisDB,
+		RedisPrefix:         getEnvOrDefault("REDIS_PREFIX", defaultEnv.RedisPrefix),
+		InfluxDSN:           getEnvOrDefault("INFLUX_DSN", defaultEnv.InfluxDSN),
+		InfluxSampleRate:    influxSampleRate,
+		AllowedMetricsCIDRs: cidrs,
 	}
 }
 

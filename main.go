@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 
@@ -22,6 +23,24 @@ func setupRedis(config Config) (*redis.Client, error) {
 	return rdb, nil
 }
 
+func isIPAllowed(remoteAddr string, cidrs []string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr // fallback if not in host:port format
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, cidr := range cidrs {
+		_, network, err := net.ParseCIDR(cidr)
+		if err == nil && network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 func setupServer(logger *Logger, rdb *redis.Client, config Config) *http.ServeMux {
 	mux := http.NewServeMux()
 	server := NewServer(logger, rdb, config, nil)
@@ -31,7 +50,16 @@ func setupServer(logger *Logger, rdb *redis.Client, config Config) *http.ServeMu
 		w.Write([]byte(fmt.Sprintf("ok\nversion: %s\n", apiConfig.Version)))
 	}))
 
-	mux.Handle("/metrics", promhttp.Handler())
+	metricsHandler := promhttp.Handler()
+	mux.Handle("/metrics", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if len(config.AllowedMetricsCIDRs) > 0 && !isIPAllowed(r.RemoteAddr, config.AllowedMetricsCIDRs) {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("Forbidden\n"))
+			return
+		}
+		metricsHandler.ServeHTTP(w, r)
+	}))
+
 	mux.Handle("/", server.logMiddleware(http.HandlerFunc(server.query)))
 	return mux
 }
