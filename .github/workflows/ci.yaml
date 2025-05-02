@@ -3,7 +3,8 @@ name: Build and Push `geocache`
 on:
   push:
     branches:
-      - master
+      - dev
+      - prod
 
 env:
   PROJECT_ID: gravitate-registry
