@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -399,5 +400,33 @@ func TestQueryResponseBodyReadError(t *testing.T) {
 	expectedBody := "Failed to read response body\n"
 	if w.Body.String() != expectedBody {
 		t.Errorf("Expected body %q, got %q", expectedBody, w.Body.String())
+	}
+}
+
+func TestPrometheusMetrics_AreUpdated(t *testing.T) {
+	server, mr, cleanup := setupTestServer(t, nil)
+	defer cleanup()
+
+	// Set up a cache hit
+	cacheKey := getCacheKey(httptest.NewRequest(http.MethodGet, "/query?location=TestLocation", nil), server.config.RedisPrefix)
+	testData := `{"test": "data"}`
+	mr.Set(cacheKey, testData)
+	mr.SetTTL(cacheKey, time.Hour)
+
+	req := httptest.NewRequest(http.MethodGet, "/query?location=TestLocation", nil)
+	w := httptest.NewRecorder()
+
+	before := testutil.ToFloat64(httpRequestsTotal.WithLabelValues("GET", "/query", "200"))
+	handler := prometheusMiddleware(http.HandlerFunc(server.query))
+	handler.ServeHTTP(w, req)
+	after := testutil.ToFloat64(httpRequestsTotal.WithLabelValues("GET", "/query", "200"))
+
+	if after-before != 1 {
+		t.Errorf("Expected httpRequestsTotal to increment by 1, got %v", after-before)
+	}
+
+	up := testutil.ToFloat64(redisUp)
+	if up != 1 {
+		t.Errorf("Expected redisUp to be 1 after successful Redis get, got %v", up)
 	}
 }

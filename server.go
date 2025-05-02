@@ -15,8 +15,47 @@ import (
 	"time"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 )
+
+var (
+	httpRequestsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests",
+		},
+		[]string{"method", "path", "status"},
+	)
+	httpRequestDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "http_request_duration_seconds",
+			Help:    "Duration of HTTP requests",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"method", "path"},
+	)
+	redisLatency = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "redis_latency_seconds",
+			Help:    "Redis round-trip latency in seconds",
+			Buckets: prometheus.DefBuckets,
+		},
+	)
+	redisUp = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "redis_up",
+			Help: "Whether Redis is up (1) or down (0)",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(httpRequestsTotal)
+	prometheus.MustRegister(httpRequestDuration)
+	prometheus.MustRegister(redisLatency)
+	prometheus.MustRegister(redisUp)
+}
 
 type Server struct {
 	logger     *Logger
@@ -132,15 +171,32 @@ func getCacheKey(r *http.Request, prefix string) string {
 	return key
 }
 
+func prometheusMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		sw := newStatusResponseWriter(w)
+		next.ServeHTTP(sw, r)
+		duration := time.Since(start).Seconds()
+		httpRequestsTotal.WithLabelValues(r.Method, r.URL.Path, fmt.Sprintf("%d", sw.statusCode)).Inc()
+		httpRequestDuration.WithLabelValues(r.Method, r.URL.Path).Observe(duration)
+	})
+}
+
 func (s *Server) query(w http.ResponseWriter, r *http.Request) {
 	cacheKey := getCacheKey(r, s.config.RedisPrefix)
 
-	if cachedResponse, err := s.redis.Get(context.Background(), cacheKey).Result(); err == nil {
+	redisStart := time.Now()
+	cachedResponse, err := s.redis.Get(context.Background(), cacheKey).Result()
+	redisLatency.Observe(time.Since(redisStart).Seconds())
+	if err == nil {
+		redisUp.Set(1)
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Cache", "HIT")
 		w.Write([]byte(cachedResponse))
 		s.recordCacheEvent("hit", r, cacheKey)
 		return
+	} else {
+		redisUp.Set(0)
 	}
 
 	googleMapsAPIKey := r.Header.Get("X-Maps-API-Key")
@@ -165,9 +221,14 @@ func (s *Server) query(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	redisSetStart := time.Now()
 	if err := s.redis.Set(context.Background(), cacheKey, body, s.config.CacheTimeout).Err(); err != nil {
+		redisUp.Set(0)
 		s.logger.log(LogWarning, "Failed to cache response: %v", err)
+	} else {
+		redisUp.Set(1)
 	}
+	redisLatency.Observe(time.Since(redisSetStart).Seconds())
 
 	w.Header().Set("Content-Type", resp.Header.Get("content-type"))
 	w.Header().Set("Date", resp.Header.Get("date"))

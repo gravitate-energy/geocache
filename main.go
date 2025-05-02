@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -30,6 +31,7 @@ func setupServer(logger *Logger, rdb *redis.Client, config Config) *http.ServeMu
 		w.Write([]byte(fmt.Sprintf("ok\nversion: %s\n", apiConfig.Version)))
 	}))
 
+	mux.Handle("/metrics", promhttp.Handler())
 	mux.Handle("/", server.logMiddleware(http.HandlerFunc(server.query)))
 	return mux
 }
@@ -48,7 +50,7 @@ func main() {
 
 	addr := fmt.Sprintf(":%s", config.ServerPort)
 	logger.log(LogInfo, "Starting server on %s", addr)
-	if err := http.ListenAndServe(addr, corsMiddleware(mux)); err != nil {
+	if err := http.ListenAndServe(addr, corsMiddleware(prometheusMiddleware(mux))); err != nil {
 		logger.log(LogCritical, "Server failed: %v", err)
 		os.Exit(1)
 	}
