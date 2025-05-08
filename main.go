@@ -60,7 +60,16 @@ func setupServer(logger *Logger, rdb *redis.Client, config Config) *http.ServeMu
 		metricsHandler.ServeHTTP(w, r)
 	}))
 
-	mux.Handle("/", server.logMiddleware(http.HandlerFunc(server.query)))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("Google Maps Proxy\nThis service proxies requests to Google Maps and caches responses.\nStatus: alive\n"))
+			return
+		}
+		server.logMiddleware(http.HandlerFunc(server.query)).ServeHTTP(w, r)
+	})
+
 	return mux
 }
 
