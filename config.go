@@ -54,6 +54,7 @@ type Config struct {
 	InfluxDSN           string
 	InfluxSampleRate    float64
 	AllowedMetricsCIDRs []string
+	VerboseLogging      bool
 }
 
 func LoadConfig() Config {
@@ -71,6 +72,11 @@ func LoadConfig() Config {
 		}
 	}
 
+	verboseLogging := false
+	if v := os.Getenv("VERBOSE_LOGGING"); v != "" {
+		verboseLogging = v == "1" || strings.ToLower(v) == "true"
+	}
+
 	return Config{
 		RedisHost:           getEnvOrDefault("REDIS_HOST", defaultEnv.RedisHost),
 		RedisPort:           getEnvOrDefault("REDIS_PORT", defaultEnv.RedisPort),
@@ -83,6 +89,7 @@ func LoadConfig() Config {
 		InfluxDSN:           getEnvOrDefault("INFLUX_DSN", defaultEnv.InfluxDSN),
 		InfluxSampleRate:    influxSampleRate,
 		AllowedMetricsCIDRs: cidrs,
+		VerboseLogging:      verboseLogging,
 	}
 }
 

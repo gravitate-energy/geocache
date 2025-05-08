@@ -1,10 +1,8 @@
-version: "2"
-
 services:
   app:
     build: .
     ports:
-      - 80:80
+      - 8081:80
     restart: unless-stopped
     depends_on:
       - redis
@@ -14,11 +12,10 @@ services:
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - LOG_FORMAT=${LOG_FORMAT:-standard}
+      - VERBOSE_LOGGING=${VERBOSE_LOGGING:-true}
 
   redis:
     image: redis:7-alpine
-    ports:
-      - 6379:6379
     volumes:
       - redis-data:/data
     restart: unless-stopped

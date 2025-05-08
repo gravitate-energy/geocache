@@ -19,6 +19,12 @@ A high-performance Google Maps API caching server that reduces the number of que
 2. Run `docker-compose up -d` to start the server and Redis
 3. Make your Google Maps API queries to `http://localhost/`
 
+To enable verbose logging for local debugging, set `VERBOSE_LOGGING=true` in your `.env` file or override it when running docker-compose:
+
+```sh
+VERBOSE_LOGGING=true docker-compose up
+```
+
 ## Environment Variables
 
 - `REDIS_HOST`: Redis server hostname (default: "redis")
@@ -32,6 +38,7 @@ A high-performance Google Maps API caching server that reduces the number of que
 - `INFLUX_DSN`: InfluxDB connection string (DSN). Example: `http://localhost:8086?org=my-org&bucket=my-bucket&token=my-token`. If set (and sample rate > 0), cache hit/miss events will be recorded to InfluxDB.
 - `INFLUX_SAMPLE_RATE`: Float between 0 and 1. Probability of recording a cache event to InfluxDB (e.g., `0.1` for 10% sampling, `1.0` for all events, `0` disables recording).
 - `ALLOWED_METRICS_CIDRS`: Comma-separated list of CIDR blocks. If set, only requests from these CIDRs can access the `/metrics` endpoint. Example: `192.168.1.0/24,10.0.0.0/8`.
+- `VERBOSE_LOGGING`: Set to `true` or `1` to enable verbose logging of proxied backend requests, including full request URI and headers. Default: `false`.
 
 ## InfluxDB Integration
 

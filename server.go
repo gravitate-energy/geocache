@@ -220,6 +220,14 @@ func (s *Server) query(w http.ResponseWriter, r *http.Request) {
 		ruri += "&key=" + googleMapsAPIKey
 	}
 
+	if s.config.VerboseLogging {
+		headers := make(map[string]string)
+		for k, v := range r.Header {
+			headers[k] = strings.Join(v, ",")
+		}
+		s.logger.log(LogInfo, "Proxying request to backend: uri=%s headers=%v", s.config.BaseURL+ruri, headers)
+	}
+
 	resp, err := s.httpClient.Get(s.config.BaseURL + ruri)
 	if err != nil {
 		s.logger.log(LogError, "Failed to fetch from Google Maps API: %v", err)

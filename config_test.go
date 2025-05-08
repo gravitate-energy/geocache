@@ -26,6 +26,7 @@ func TestLoadConfig(t *testing.T) {
 				RedisPrefix:      defaultEnv.RedisPrefix,
 				InfluxDSN:        defaultEnv.InfluxDSN,
 				InfluxSampleRate: defaultEnv.InfluxSampleRate,
+				VerboseLogging:   false,
 			},
 		},
 		{
@@ -41,6 +42,7 @@ func TestLoadConfig(t *testing.T) {
 				"REDIS_PREFIX":        "prod",
 				"INFLUX_DSN":          "http://influxdb:8086?org=test&bucket=cache&token=abc",
 				"INFLUX_SAMPLE_RATE":  "0.25",
+				"VERBOSE_LOGGING":     "true",
 			},
 			expected: Config{
 				RedisHost:        "custom-redis",
@@ -53,6 +55,26 @@ func TestLoadConfig(t *testing.T) {
 				RedisPrefix:      "prod",
 				InfluxDSN:        "http://influxdb:8086?org=test&bucket=cache&token=abc",
 				InfluxSampleRate: 0.25,
+				VerboseLogging:   true,
+			},
+		},
+		{
+			name: "explicitly disables verbose logging",
+			envVars: map[string]string{
+				"VERBOSE_LOGGING": "false",
+			},
+			expected: Config{
+				RedisHost:        defaultEnv.RedisHost,
+				RedisPort:        defaultEnv.RedisPort,
+				ServerPort:       defaultEnv.ServerPort,
+				LogFormat:        "",
+				BaseURL:          defaultEnv.BaseURL,
+				CacheTimeout:     defaultEnv.CacheTimeout,
+				RedisDB:          defaultEnv.RedisDB,
+				RedisPrefix:      defaultEnv.RedisPrefix,
+				InfluxDSN:        defaultEnv.InfluxDSN,
+				InfluxSampleRate: defaultEnv.InfluxSampleRate,
+				VerboseLogging:   false,
 			},
 		},
 	}
@@ -98,6 +120,9 @@ func TestLoadConfig(t *testing.T) {
 			}
 			if config.InfluxSampleRate != tt.expected.InfluxSampleRate {
 				t.Errorf("InfluxSampleRate = %v, want %v", config.InfluxSampleRate, tt.expected.InfluxSampleRate)
+			}
+			if config.VerboseLogging != tt.expected.VerboseLogging {
+				t.Errorf("VerboseLogging = %v, want %v", config.VerboseLogging, tt.expected.VerboseLogging)
 			}
 		})
 	}
