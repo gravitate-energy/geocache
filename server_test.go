@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -428,5 +430,51 @@ func TestPrometheusMetrics_AreUpdated(t *testing.T) {
 	up := testutil.ToFloat64(redisUp)
 	if up != 1 {
 		t.Errorf("Expected redisUp to be 1 after successful Redis get, got %v", up)
+	}
+}
+
+func TestLog_CacheHitAndMiss(t *testing.T) {
+	var buf bytes.Buffer
+	origOutput := log.Writer()
+	log.SetOutput(&buf)
+	defer log.SetOutput(origOutput)
+
+	server, mr, cleanup := setupTestServer(t, nil)
+	defer cleanup()
+
+	// Cache miss: ensure key is not present
+	cacheKey := getCacheKey(httptest.NewRequest(http.MethodGet, "/query?location=TestLocation", nil), server.config.RedisPrefix)
+	mr.Del(cacheKey)
+
+	reqMiss := httptest.NewRequest(http.MethodGet, "/query?location=TestLocation", nil)
+	wMiss := httptest.NewRecorder()
+	// Use a mock HTTP client to avoid real network call
+	mockResp := &http.Response{
+		Status:     "200 OK",
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"mock": "response"}`)),
+		Header:     make(http.Header),
+	}
+	mockResp.Header.Set("content-type", "application/json")
+	server.httpClient = &http.Client{Transport: &MockTransport{Response: mockResp}}
+
+	// Wrap with logMiddleware
+	handler := server.logMiddleware(http.HandlerFunc(server.query))
+	handler.ServeHTTP(wMiss, reqMiss)
+
+	if !strings.Contains(buf.String(), "cache:MISS") {
+		t.Errorf("Expected log to contain cache:MISS, got: %s", buf.String())
+	}
+	buf.Reset()
+
+	// Cache hit: set the value in Redis
+	mr.Set(cacheKey, `{"mock": "response"}`)
+	mr.SetTTL(cacheKey, time.Hour)
+	reqHit := httptest.NewRequest(http.MethodGet, "/query?location=TestLocation", nil)
+	wHit := httptest.NewRecorder()
+	handler.ServeHTTP(wHit, reqHit)
+
+	if !strings.Contains(buf.String(), "cache:HIT") {
+		t.Errorf("Expected log to contain cache:HIT, got: %s", buf.String())
 	}
 }

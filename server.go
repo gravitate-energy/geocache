@@ -69,6 +69,17 @@ type Server struct {
 	influxURL  string
 }
 
+type cacheStatusResponseWriter struct {
+	statusResponseWriter
+	cacheStatus string
+}
+
+func newCacheStatusResponseWriter(w http.ResponseWriter) *cacheStatusResponseWriter {
+	return &cacheStatusResponseWriter{
+		statusResponseWriter: *newStatusResponseWriter(w),
+	}
+}
+
 func NewServer(logger *Logger, redis *redis.Client, config Config, httpClient *http.Client) *Server {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
@@ -194,6 +205,9 @@ func (s *Server) query(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Cache", "HIT")
 		w.Write([]byte(cachedResponse))
 		s.recordCacheEvent("hit", r, cacheKey)
+		if csw, ok := w.(*cacheStatusResponseWriter); ok {
+			csw.cacheStatus = "HIT"
+		}
 		return
 	} else {
 		redisUp.Set(0)
@@ -237,6 +251,9 @@ func (s *Server) query(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Cache", "MISS")
 	w.Write(body)
 	s.recordCacheEvent("miss", r, cacheKey)
+	if csw, ok := w.(*cacheStatusResponseWriter); ok {
+		csw.cacheStatus = "MISS"
+	}
 }
 
 func (s *Server) logMiddleware(next http.Handler) http.Handler {
@@ -247,17 +264,18 @@ func (s *Server) logMiddleware(next http.Handler) http.Handler {
 				ip = r.RemoteAddr
 			}
 
-			sw := newStatusResponseWriter(w)
-			next.ServeHTTP(sw, r)
+			csw := newCacheStatusResponseWriter(w)
+			next.ServeHTTP(csw, r)
 
 			entry := logEntry{
-				Message:    fmt.Sprintf("%s %s", r.Method, r.URL.Path),
-				Severity:   LogInfo,
-				Timestamp:  time.Now(),
-				IP:         ip,
-				Method:     r.Method,
-				Path:       r.URL.Path,
-				StatusCode: sw.statusCode,
+				Message:     fmt.Sprintf("%s %s", r.Method, r.URL.Path),
+				Severity:    LogInfo,
+				Timestamp:   time.Now(),
+				IP:          ip,
+				Method:      r.Method,
+				Path:        r.URL.Path,
+				StatusCode:  csw.statusCode,
+				CacheStatus: csw.cacheStatus,
 			}
 
 			if s.logger.useGCP {
@@ -265,7 +283,7 @@ func (s *Server) logMiddleware(next http.Handler) http.Handler {
 					fmt.Println(string(b))
 				}
 			} else {
-				log.Printf("%s [%s] %s - %d", ip, r.Method, r.URL.Path, sw.statusCode)
+				log.Printf("%s [%s] %s - %d - cache:%s", ip, r.Method, r.URL.Path, csw.statusCode, csw.cacheStatus)
 			}
 			return
 		}
