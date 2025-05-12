@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -66,7 +68,6 @@ func TestGetCacheKey(t *testing.T) {
 		name   string
 		path   string
 		prefix string
-		want   string
 	}{
 		{
 			name:   "simple path no prefix",
@@ -88,6 +89,21 @@ func TestGetCacheKey(t *testing.T) {
 			path:   "/query?location=NewYork&radius=10&type=restaurant",
 			prefix: "staging",
 		},
+		{
+			name:   "path with key param",
+			path:   "/query?location=NewYork&key=abc123",
+			prefix: "",
+		},
+		{
+			name:   "path with key param in different position",
+			path:   "/query?key=abc123&location=NewYork",
+			prefix: "",
+		},
+		{
+			name:   "path with same params different order",
+			path:   "/query?radius=10&type=restaurant&location=NewYork",
+			prefix: "staging",
+		},
 	}
 
 	seen := make(map[string]string)
@@ -106,7 +122,10 @@ func TestGetCacheKey(t *testing.T) {
 			}
 
 			if prev, exists := seen[got]; exists {
-				t.Errorf("getCacheKey() returned duplicate hash for different paths: %q and %q", tt.path, prev)
+				// Only allow duplicate hash if the paths are equivalent after removing 'key' and sorting params
+				if !equivalentPaths(tt.path, prev) {
+					t.Errorf("getCacheKey() returned duplicate hash for different paths: %q and %q", tt.path, prev)
+				}
 			}
 			seen[got] = tt.path
 
@@ -116,6 +135,58 @@ func TestGetCacheKey(t *testing.T) {
 			}
 		})
 	}
+
+	// Explicitly test that key param and param order do not affect the cache key
+	req1 := httptest.NewRequest(http.MethodGet, "/query?location=NewYork&key=abc123", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/query?key=def456&location=NewYork", nil)
+	key1 := getCacheKey(req1, "")
+	key2 := getCacheKey(req2, "")
+	if key1 != key2 {
+		t.Errorf("Cache key should be the same when only the 'key' param or its value changes. Got %q and %q", key1, key2)
+	}
+
+	req3 := httptest.NewRequest(http.MethodGet, "/query?radius=10&type=restaurant&location=NewYork", nil)
+	req4 := httptest.NewRequest(http.MethodGet, "/query?location=NewYork&type=restaurant&radius=10", nil)
+	key3 := getCacheKey(req3, "staging")
+	key4 := getCacheKey(req4, "staging")
+	if key3 != key4 {
+		t.Errorf("Cache key should be the same for same params in different order. Got %q and %q", key3, key4)
+	}
+}
+
+// equivalentPaths returns true if two paths are equivalent after removing 'key' param and sorting params
+func equivalentPaths(a, b string) bool {
+	parse := func(s string) (string, []string) {
+		u, _ := url.Parse(s)
+		q := u.Query()
+		q.Del("key")
+		keys := make([]string, 0, len(q))
+		for k := range q {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		params := make([]string, 0, len(keys))
+		for _, k := range keys {
+			for _, v := range q[k] {
+				params = append(params, k+"="+v)
+			}
+		}
+		return u.Path, params
+	}
+	pa, qa := parse(a)
+	pb, qb := parse(b)
+	if pa != pb {
+		return false
+	}
+	if len(qa) != len(qb) {
+		return false
+	}
+	for i := range qa {
+		if qa[i] != qb[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestServer_Query_CacheHit(t *testing.T) {

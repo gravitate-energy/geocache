@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -173,8 +174,30 @@ func obfuscateAPIKey(key string) string {
 }
 
 func getCacheKey(r *http.Request, prefix string) string {
+	u := *r.URL // shallow copy
+	q := u.Query()
+	q.Del("key")
+
+	// Sort query parameters for normalization
+	keys := make([]string, 0, len(q))
+	for k := range q {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	norm := u.Path
+	if len(keys) > 0 {
+		params := make([]string, 0, len(keys))
+		for _, k := range keys {
+			for _, v := range q[k] {
+				params = append(params, url.QueryEscape(k)+"="+url.QueryEscape(v))
+			}
+		}
+		norm += "?" + strings.Join(params, "&")
+	}
+
 	h := sha256.New()
-	h.Write([]byte(r.URL.RequestURI()))
+	h.Write([]byte(norm))
 	key := hex.EncodeToString(h.Sum(nil))
 	if prefix != "" {
 		return prefix + ":" + key
