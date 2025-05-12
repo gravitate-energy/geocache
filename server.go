@@ -334,7 +334,7 @@ func (s *Server) logMiddleware(next http.Handler) http.Handler {
 
 			msg := fmt.Sprintf("%s %s", r.Method, r.URL.Path)
 			if s.logger.useGCP {
-				s.logger.logWithReferrer(LogInfo, msg, referrer)
+				s.logger.logWithReferrer(LogInfo, msg, referrer, csw.cacheStatus, csw.statusCode)
 			} else {
 				log.Printf("%s [%s] %s - %d - cache:%s - referrer:%s", ip, r.Method, r.URL.Path, csw.statusCode, csw.cacheStatus, referrer)
 			}

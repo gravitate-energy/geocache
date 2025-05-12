@@ -248,24 +248,28 @@ func TestLoggerMiddlewareOutput(t *testing.T) {
 
 func TestLoggerWithReferrer(t *testing.T) {
 	tests := []struct {
-		name     string
-		useGCP   bool
-		referrer string
+		name        string
+		useGCP      bool
+		referrer    string
+		cacheStatus string
+		statusCode  int
 	}{
-		{"Standard logging with referrer", false, "example.com"},
-		{"GCP logging with referrer", true, "foo.bar"},
+		{"Standard logging with referrer", false, "example.com", "HIT", 200},
+		{"GCP logging with referrer", true, "foo.bar", "MISS", 404},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := NewLogger(tt.useGCP)
 			msg := "Test message with referrer"
-			logger.logWithReferrer(LogInfo, msg, tt.referrer)
+			logger.logWithReferrer(LogInfo, msg, tt.referrer, tt.cacheStatus, tt.statusCode)
 
 			entry := logEntry{
-				Message:  msg,
-				Severity: LogInfo,
-				Referrer: tt.referrer,
+				Message:     msg,
+				Severity:    LogInfo,
+				Referrer:    tt.referrer,
+				CacheStatus: tt.cacheStatus,
+				StatusCode:  tt.statusCode,
 			}
 
 			b, err := json.Marshal(entry)
@@ -280,6 +284,12 @@ func TestLoggerWithReferrer(t *testing.T) {
 
 			if decoded.Referrer != tt.referrer {
 				t.Errorf("Referrer = %v, want %v", decoded.Referrer, tt.referrer)
+			}
+			if decoded.CacheStatus != tt.cacheStatus {
+				t.Errorf("CacheStatus = %v, want %v", decoded.CacheStatus, tt.cacheStatus)
+			}
+			if decoded.StatusCode != tt.statusCode {
+				t.Errorf("StatusCode = %v, want %v", decoded.StatusCode, tt.statusCode)
 			}
 		})
 	}

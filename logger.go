@@ -54,12 +54,14 @@ func (l *Logger) log(severity LogSeverity, format string, v ...interface{}) {
 	log.Printf(format, v...)
 }
 
-func (l *Logger) logWithReferrer(severity LogSeverity, format string, referrer string, v ...interface{}) {
+func (l *Logger) logWithReferrer(severity LogSeverity, format string, referrer string, cacheStatus string, statusCode int, v ...interface{}) {
 	entry := logEntry{
-		Message:   fmt.Sprintf(format, v...),
-		Severity:  severity,
-		Timestamp: time.Now(),
-		Referrer:  referrer,
+		Message:     fmt.Sprintf(format, v...),
+		Severity:    severity,
+		Timestamp:   time.Now(),
+		Referrer:    referrer,
+		CacheStatus: cacheStatus,
+		StatusCode:  statusCode,
 	}
 
 	if l.useGCP {
