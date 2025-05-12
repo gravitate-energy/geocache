@@ -329,6 +329,7 @@ func (s *Server) logMiddleware(next http.Handler) http.Handler {
 			if refHeader != "" {
 				if u, err := url.Parse(refHeader); err == nil {
 					referrer = u.Host
+					referrer = strings.TrimSuffix(referrer, ".bb.gravitate.energy")
 				}
 			}
 

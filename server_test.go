@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -634,5 +635,64 @@ func TestLog_CacheHitAndMiss(t *testing.T) {
 
 	if !strings.Contains(buf.String(), "cache:HIT") {
 		t.Errorf("Expected log to contain cache:HIT, got: %s", buf.String())
+	}
+}
+
+func TestLogMiddleware_ReferrerSuffixStripping(t *testing.T) {
+	var buf bytes.Buffer
+	origOutput := log.Writer()
+	log.SetOutput(&buf)
+	defer log.SetOutput(origOutput)
+
+	server, _, cleanup := setupTestServer(t, nil)
+	defer cleanup()
+
+	cases := []struct {
+		name         string
+		referer      string
+		wantReferrer string
+	}{
+		{"strips .bb.gravitate.energy", "https://foo.bb.gravitate.energy/some/path", "foo"},
+		{"keeps other domains", "https://bar.example.com/some/path", "bar.example.com"},
+		{"keeps subdomain with similar ending", "https://baz.bb.gravitate.energy.com/path", "baz.bb.gravitate.energy.com"},
+	}
+
+	handler := server.logMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			buf.Reset()
+			req := httptest.NewRequest(http.MethodGet, "/maps/api/directions/json", nil)
+			req.Header.Set("Referer", tc.referer)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			if !strings.Contains(buf.String(), "referrer:"+tc.wantReferrer) {
+				t.Errorf("Expected log to contain referrer:%s, got: %s", tc.wantReferrer, buf.String())
+			}
+		})
+	}
+
+	// Test with GCP logger
+	server.logger.useGCP = true
+	for _, tc := range cases {
+		t.Run(tc.name+"_GCP", func(t *testing.T) {
+			buf.Reset()
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+			req := httptest.NewRequest(http.MethodGet, "/maps/api/directions/json", nil)
+			req.Header.Set("Referer", tc.referer)
+			respW := httptest.NewRecorder()
+			handler.ServeHTTP(respW, req)
+			w.Close()
+			os.Stdout = oldStdout
+			out, _ := io.ReadAll(r)
+			r.Close()
+			if !strings.Contains(string(out), tc.wantReferrer) {
+				t.Errorf("Expected GCP log to contain referrer %s, got: %s", tc.wantReferrer, string(out))
+			}
+		})
 	}
 }
