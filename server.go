@@ -174,14 +174,36 @@ func obfuscateAPIKey(key string) string {
 }
 
 func getCacheKey(r *http.Request, prefix string) string {
-	u := *r.URL // shallow copy
+	u := *r.URL
 	q := u.Query()
-	q.Del("key")
 
-	// Sort query parameters for normalization
+	var whitelist map[string]bool
+
+	switch u.Path {
+	case "/maps/api/directions/json":
+		whitelist = map[string]bool{
+			"origin":      true,
+			"destination": true,
+		}
+	case "/maps/api/distancematrix/json":
+		whitelist = map[string]bool{
+			"origins":      true,
+			"destinations": true,
+		}
+	default:
+		whitelist = map[string]bool{}
+		for k := range q {
+			if k != "key" {
+				whitelist[k] = true
+			}
+		}
+	}
+
 	keys := make([]string, 0, len(q))
 	for k := range q {
-		keys = append(keys, k)
+		if whitelist[k] {
+			keys = append(keys, k)
+		}
 	}
 	sort.Strings(keys)
 
@@ -189,7 +211,9 @@ func getCacheKey(r *http.Request, prefix string) string {
 	if len(keys) > 0 {
 		params := make([]string, 0, len(keys))
 		for _, k := range keys {
-			for _, v := range q[k] {
+			vals := q[k]
+			sort.Strings(vals)
+			for _, v := range vals {
 				params = append(params, url.QueryEscape(k)+"="+url.QueryEscape(v))
 			}
 		}

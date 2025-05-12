@@ -152,6 +152,93 @@ func TestGetCacheKey(t *testing.T) {
 	if key3 != key4 {
 		t.Errorf("Cache key should be the same for same params in different order. Got %q and %q", key3, key4)
 	}
+
+	// Additional tests for endpoint-specific whitelisting
+	directionsTests := []struct {
+		name        string
+		path        string
+		prefix      string
+		shouldMatch bool
+	}{
+		{
+			name:        "directions: only origin and destination matter",
+			path:        "/maps/api/directions/json?origin=30.1,40.2&destination=31.1,41.2&foo=bar",
+			prefix:      "",
+			shouldMatch: true,
+		},
+		{
+			name:        "directions: extra param ignored",
+			path:        "/maps/api/directions/json?destination=31.1,41.2&origin=30.1,40.2&baz=qux",
+			prefix:      "",
+			shouldMatch: true,
+		},
+		{
+			name:        "directions: different origin",
+			path:        "/maps/api/directions/json?origin=32.1,42.2&destination=31.1,41.2",
+			prefix:      "",
+			shouldMatch: false,
+		},
+	}
+
+	directionsKey := ""
+	for i, tt := range directionsTests {
+		req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+		key := getCacheKey(req, tt.prefix)
+		if i == 0 {
+			directionsKey = key
+		} else if tt.shouldMatch {
+			if key != directionsKey {
+				t.Errorf("Directions cache key mismatch: got %q, want %q", key, directionsKey)
+			}
+		} else {
+			if key == directionsKey {
+				t.Errorf("Directions cache key should differ for different origin/destination: %q", key)
+			}
+		}
+	}
+
+	distMatrixTests := []struct {
+		name        string
+		path        string
+		prefix      string
+		shouldMatch bool
+	}{
+		{
+			name:        "distancematrix: only origins and destinations matter",
+			path:        "/maps/api/distancematrix/json?origins=30.1,40.2&destinations=31.1,41.2&foo=bar",
+			prefix:      "",
+			shouldMatch: true,
+		},
+		{
+			name:        "distancematrix: extra param ignored",
+			path:        "/maps/api/distancematrix/json?destinations=31.1,41.2&origins=30.1,40.2&baz=qux",
+			prefix:      "",
+			shouldMatch: true,
+		},
+		{
+			name:        "distancematrix: different origins",
+			path:        "/maps/api/distancematrix/json?origins=32.1,42.2&destinations=31.1,41.2",
+			prefix:      "",
+			shouldMatch: false,
+		},
+	}
+
+	distMatrixKey := ""
+	for i, tt := range distMatrixTests {
+		req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+		key := getCacheKey(req, tt.prefix)
+		if i == 0 {
+			distMatrixKey = key
+		} else if tt.shouldMatch {
+			if key != distMatrixKey {
+				t.Errorf("DistanceMatrix cache key mismatch: got %q, want %q", key, distMatrixKey)
+			}
+		} else {
+			if key == distMatrixKey {
+				t.Errorf("DistanceMatrix cache key should differ for different origins/destinations: %q", key)
+			}
+		}
+	}
 }
 
 // equivalentPaths returns true if two paths are equivalent after removing 'key' param and sorting params
