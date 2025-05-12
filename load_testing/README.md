@@ -78,3 +78,21 @@ The script automatically tracks and reports 502 errors. Check the console output
 
 - In Web UI mode: Click the "Stop" button
 - In Headless mode: The test will stop after the specified duration, or press Ctrl+C
+
+## Cache Hit/Miss Test Scripts
+
+This directory contains scripts to emulate Google Maps API requests (directions and distance matrix) against a locally running geocache server. These scripts help verify cache hits and misses by repeating requests and observing the `X-Cache` response header.
+
+### Usage
+
+1. Install dependencies:
+   ```sh
+   pip install -r requirements.txt
+   ```
+2. Run the scripts:
+   ```sh
+   python test_directions.py
+   python test_distance_matrix.py
+   ```
+
+Adjust the server URL and API key in the scripts as needed.
