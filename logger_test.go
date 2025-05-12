@@ -245,3 +245,42 @@ func TestLoggerMiddlewareOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestLoggerWithReferrer(t *testing.T) {
+	tests := []struct {
+		name     string
+		useGCP   bool
+		referrer string
+	}{
+		{"Standard logging with referrer", false, "example.com"},
+		{"GCP logging with referrer", true, "foo.bar"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := NewLogger(tt.useGCP)
+			msg := "Test message with referrer"
+			logger.logWithReferrer(LogInfo, msg, tt.referrer)
+
+			entry := logEntry{
+				Message:  msg,
+				Severity: LogInfo,
+				Referrer: tt.referrer,
+			}
+
+			b, err := json.Marshal(entry)
+			if err != nil {
+				t.Fatalf("Failed to marshal log entry: %v", err)
+			}
+
+			var decoded logEntry
+			if err := json.Unmarshal(b, &decoded); err != nil {
+				t.Fatalf("Failed to unmarshal log entry: %v", err)
+			}
+
+			if decoded.Referrer != tt.referrer {
+				t.Errorf("Referrer = %v, want %v", decoded.Referrer, tt.referrer)
+			}
+		})
+	}
+}

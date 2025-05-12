@@ -30,6 +30,7 @@ type logEntry struct {
 	Error       string      `json:"error,omitempty"`
 	StatusCode  int         `json:"status_code,omitempty"`
 	CacheStatus string      `json:"cache_status,omitempty"`
+	Referrer    string      `json:"referrer,omitempty"`
 }
 
 func NewLogger(useGCP bool) *Logger {
@@ -41,6 +42,24 @@ func (l *Logger) log(severity LogSeverity, format string, v ...interface{}) {
 		Message:   fmt.Sprintf(format, v...),
 		Severity:  severity,
 		Timestamp: time.Now(),
+	}
+
+	if l.useGCP {
+		if b, err := json.Marshal(entry); err == nil {
+			fmt.Println(string(b))
+			return
+		}
+	}
+
+	log.Printf(format, v...)
+}
+
+func (l *Logger) logWithReferrer(severity LogSeverity, format string, referrer string, v ...interface{}) {
+	entry := logEntry{
+		Message:   fmt.Sprintf(format, v...),
+		Severity:  severity,
+		Timestamp: time.Now(),
+		Referrer:  referrer,
 	}
 
 	if l.useGCP {

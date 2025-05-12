@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -322,23 +321,22 @@ func (s *Server) logMiddleware(next http.Handler) http.Handler {
 			csw := newCacheStatusResponseWriter(w)
 			next.ServeHTTP(csw, r)
 
-			entry := logEntry{
-				Message:     fmt.Sprintf("%s %s", r.Method, r.URL.Path),
-				Severity:    LogInfo,
-				Timestamp:   time.Now(),
-				IP:          ip,
-				Method:      r.Method,
-				Path:        r.URL.Path,
-				StatusCode:  csw.statusCode,
-				CacheStatus: csw.cacheStatus,
+			refHeader := r.Header.Get("Referer")
+			if refHeader == "" {
+				refHeader = r.Header.Get("Origin")
+			}
+			referrer := ""
+			if refHeader != "" {
+				if u, err := url.Parse(refHeader); err == nil {
+					referrer = u.Host
+				}
 			}
 
+			msg := fmt.Sprintf("%s %s", r.Method, r.URL.Path)
 			if s.logger.useGCP {
-				if b, err := json.Marshal(entry); err == nil {
-					fmt.Println(string(b))
-				}
+				s.logger.logWithReferrer(LogInfo, msg, referrer)
 			} else {
-				log.Printf("%s [%s] %s - %d - cache:%s", ip, r.Method, r.URL.Path, csw.statusCode, csw.cacheStatus)
+				log.Printf("%s [%s] %s - %d - cache:%s - referrer:%s", ip, r.Method, r.URL.Path, csw.statusCode, csw.cacheStatus, referrer)
 			}
 			return
 		}
