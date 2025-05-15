@@ -183,6 +183,7 @@ func getCacheKey(r *http.Request, prefix string) string {
 		whitelist = map[string]bool{
 			"origin":      true,
 			"destination": true,
+			"waypoints":   true,
 		}
 	case "/maps/api/distancematrix/json":
 		whitelist = map[string]bool{
